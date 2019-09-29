@@ -1,0 +1,11 @@
+<launch>
+
+  <node pkg="pytopic_demo" type="pytalker.py" name="pytalker" output="screen">
+  
+  </node>
+
+  <node pkg="pytopic_demo" type="pylistener.py" name="pylistener" output="screen">
+  
+  </node>
+  
+</launch>

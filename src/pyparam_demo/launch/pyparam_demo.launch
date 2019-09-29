@@ -1,0 +1,19 @@
+<launch>
+
+  <node pkg="pyparam_demo" type="pyparamtalker.py" name="pyparamtalker" output="screen">
+  
+  </node>
+
+  <node pkg="pyparam_demo" type="pyparamlistener.py" name="pyparamlistener" output="screen">
+  
+  </node>
+  
+  <param name="x" type="double" value="1.0" />
+  
+  <param name="y" type="double" value="1.0" />
+  
+  <rosparam param="arrays">[1,2]</rosparam>
+  
+  <rosparam param="movable">True</rosparam>
+  
+</launch>

@@ -3,10 +3,9 @@
 import numpy as np
 import cv2
 import rospy
+import os
 from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs import point_cloud2
-import pdb
-import os
 
 
 # 实验一：三维空间刚体运动的描述方式
@@ -70,13 +69,16 @@ if __name__ == '__main__':
     poses = []  # 保存相机的外参，即转换后的变换矩阵
 
     # 读取文件，将外参保存在列表中
-    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment1")
+    data_path = os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), "experiment1")
     pose_data = np.loadtxt(os.path.join(data_path, "pose.txt"))
 
     for i in range(5):
         # 利用opencv读取RGB和深度图，按顺序保存在colorImgs和depthImgs中
-        colorImgs.append(cv2.imread(os.path.join(data_path, "color", str(i + 1) + ".png")))
-        depthImgs.append(cv2.imread(os.path.join(data_path, "depth", str(i + 1) + ".pgm"),  cv2.IMREAD_UNCHANGED))
+        colorImgs.append(cv2.imread(os.path.join(
+            data_path, "color", str(i + 1) + ".png")))
+        depthImgs.append(cv2.imread(os.path.join(
+            data_path, "depth", str(i + 1) + ".pgm"), cv2.IMREAD_UNCHANGED))
 
         # 将poses列表中的单元转成变换矩阵T储存
         R = q2R(np.roll(pose_data[i][3:], 1))  # 将实部移至四元数开始以代入q2R函数
@@ -91,38 +93,51 @@ if __name__ == '__main__':
     fy = 519.0
     depthScale = 1000.0
     K = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+    K_inv = np.linalg.inv(K)
 
     # 新建一个列表，保存所有点的世界坐标
     cloudWorld = []
 
     for i in range(5):
         print("processing image " + str(i + 1))
-        [rows, cols] = depthImgs[i].shape
-        for r in range(rows):
-            for c in range(cols):
-                # color = colorImgs[i][r, c]
-                depth = depthImgs[i][r, c]
-                T = poses[i]
-                Puv = np.array([c, r, 1])
 
-                # 将像素坐标转换成相机坐标
-                Pc = np.dot(np.linalg.inv(K), Puv) * depth / depthScale
-                Pc = np.append(Pc, 1.0)
+        T = poses[i]
+        color = colorImgs[i]
+        depth = depthImgs[i]
 
-                # 利用变换矩阵T，将相机坐标转换成世界坐标
-                Pw = np.dot(T, Pc)[:3]
+        # 
+        [rows, cols] = depth.shape
+        x, y = np.meshgrid(range(cols), range(rows))
+        Puv = np.dstack((x, y, np.ones(depth.shape))).reshape(-1, 3).T
 
-                # 将世界坐标添加到cloudWorld中
-                cloudWorld.append(Pw)
+        # 将像素坐标转换成相机坐标
+        Pc = np.dot(K_inv, Puv) * depth.flatten() / depthScale
+        Pc = np.vstack((Pc, np.ones(rows * cols)))
+        # print(Pc.shape)
+        # Pc = np.append(Pc, 1.0)
+
+        # 利用变换矩阵T，将相机坐标转换成世界坐标
+        Pw = np.dot(T, Pc)[:3]
+
+        # 将世界坐标添加到cloudWorld中
+        color = np.array(color.reshape(-1, 3).T, dtype=np.int32)
+        rgb = (color[0] << 16) + (color[1] << 8) + color[2]
+        cloudWorld.extend(np.array(np.vstack((Pw, rgb)), dtype=np.float32).T)
 
     # ROS相关操作，将点云信息发布出去
     rospy.init_node('test', anonymous=True)
     pub_cloud = rospy.Publisher("/points", PointCloud2)
-    while not rospy.is_shutdown():
-        pcloud = PointCloud2()
-        pcloud = point_cloud2.create_cloud_xyz32(pcloud.header, cloudWorld)
+    pcloud = PointCloud2()
 
-        pcloud.header.frame_id = "/map"
+    # make point cloud
+    fields = [PointField('x', 0, PointField.FLOAT32, 1),
+              PointField('y', 4, PointField.FLOAT32, 1),
+              PointField('z', 8, PointField.FLOAT32, 1),
+              PointField('rgb', 12, PointField.UINT32, 1),
+              ]
+    pcloud = point_cloud2.create_cloud(pcloud.header, fields, cloudWorld)
+    pcloud.header.frame_id = "/map"
+
+    while not rospy.is_shutdown():
         pub_cloud.publish(pcloud)
-        # rospy.loginfo(pcloud)
         rospy.sleep(1.0)

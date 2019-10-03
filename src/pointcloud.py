@@ -105,23 +105,21 @@ if __name__ == '__main__':
         color = colorImgs[i]
         depth = depthImgs[i]
 
-        # 
+        # 将纵坐标、横坐标叠于深度之上，形成向量化的像素坐标
         [rows, cols] = depth.shape
         x, y = np.meshgrid(range(cols), range(rows))
         Puv = np.dstack((x, y, np.ones(depth.shape))).reshape(-1, 3).T
 
         # 将像素坐标转换成相机坐标
         Pc = np.dot(K_inv, Puv) * depth.flatten() / depthScale
-        Pc = np.vstack((Pc, np.ones(rows * cols)))
-        # print(Pc.shape)
-        # Pc = np.append(Pc, 1.0)
+        Pc = np.vstack((Pc, np.ones(rows * cols)))  # 补1以形成齐次坐标
 
         # 利用变换矩阵T，将相机坐标转换成世界坐标
         Pw = np.dot(T, Pc)[:3]
 
         # 将世界坐标添加到cloudWorld中
-        color = np.array(color.reshape(-1, 3).T, dtype=np.int32)
-        rgb = (color[0] << 16) + (color[1] << 8) + color[2]
+        color = np.array(color.reshape(-1, 3).T, dtype=np.int32)  # 将原图转为二维
+        rgb = (color[0] << 16) + (color[1] << 8) + color[2]  # 将rgb信息打包
         cloudWorld.extend(np.array(np.vstack((Pw, rgb)), dtype=np.float32).T)
 
     # ROS相关操作，将点云信息发布出去
@@ -140,4 +138,5 @@ if __name__ == '__main__':
 
     while not rospy.is_shutdown():
         pub_cloud.publish(pcloud)
+        # rospy.loginfo(pcloud)
         rospy.sleep(1.0)

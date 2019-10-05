@@ -119,12 +119,12 @@ if __name__ == '__main__':
 
         # 将世界坐标添加到cloudWorld中
         color = np.array(color.reshape(-1, 3).T, dtype=np.int32)  # 将原图转为二维
-        rgb = (color[0] << 16) + (color[1] << 8) + color[2]  # 将rgb信息打包
+        rgb = (color[2] << 16) + (color[1] << 8) + color[0]  # 将rgb信息打包
         cloudWorld.extend(np.array(np.vstack((Pw, rgb)), dtype=np.float32).T)
 
     # ROS相关操作，将点云信息发布出去
     rospy.init_node('test', anonymous=True)
-    pub_cloud = rospy.Publisher("/points", PointCloud2)
+    pub_cloud = rospy.Publisher("/points", PointCloud2, queue_size=10)
     pcloud = PointCloud2()
 
     # make point cloud
@@ -135,6 +135,7 @@ if __name__ == '__main__':
               ]
     pcloud = point_cloud2.create_cloud(pcloud.header, fields, cloudWorld)
     pcloud.header.frame_id = "/map"
+    print("pointcloud created")
 
     while not rospy.is_shutdown():
         pub_cloud.publish(pcloud)

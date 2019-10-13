@@ -123,7 +123,7 @@ def FindQr(imgSrc):
     cv2.imshow("g", imgBinary)
 
     # 查找轮廓
-    contours, hierarchy = cv2.findContours(imgBinary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(imgBinary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[-2:]
 
     # 筛选定位角：黑色定位角满足父轮廓有两个子轮廓
     parentIdx = -1

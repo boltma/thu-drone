@@ -99,7 +99,7 @@ def IsQrPoint(contour, img, i):
 
 # 二维码解码
 def QrDecode(img):
-    return decode(img)
+    return decode(img)[0].data
 
 
 def FindQr(imgSrc):

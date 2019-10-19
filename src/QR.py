@@ -149,20 +149,19 @@ def FindQr(imgSrc):
 
     cv2.imshow("contour", imgSrcClone)
 
-    # 绘制二维码定位角
-    for point in qrPoint:
-        x, y, w, h = cv2.boundingRect(point)
-        cv2.rectangle(imgSrc, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
     # 根据相邻三个定位角确定二维码整体位置框
     qrCenter = []
     state = [0] * len(qrPoint)
     qrBox = []
     qrCode = []
-    # 计算定位角质心
-    for i in range(len(qrPoint)):
-        center = np.sum(qrPoint[i], axis=0) / qrPoint[i].shape[0]
+
+    # 绘制二维码定位角并计算定位角质心
+    for point in qrPoint:
+        x, y, w, h = cv2.boundingRect(point)
+        cv2.rectangle(imgSrc, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        center = np.array([x + w / 2.0, y + h / 2.0])
         qrCenter.append(center)
+
     # 判断是否构成一个二维码
     cnt = 1
     for i in range(len(qrPoint)):
@@ -205,7 +204,7 @@ def FindQr(imgSrc):
 if __name__ == '__main__':
     # 读入图像
     data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment2", "imgs")
-    image = cv2.imread(os.path.join(data_path, str(14) + ".jpg"))
+    image = cv2.imread(os.path.join(data_path, str(12) + ".jpg"))
     # 打印信息
     print(image.shape[:2])
 

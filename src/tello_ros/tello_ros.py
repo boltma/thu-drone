@@ -60,8 +60,8 @@ try:
 		if frame is None or frame.size == 0:
 			continue
 		img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-		#cv2.imshow("img", img)
-		#cv2.waitKey(1)
+		cv2.imshow("img", img)
+		cv2.waitKey(1)
 
 		try:
 			img_msg = CvBridge().cv2_to_imgmsg(img, 'bgr8')

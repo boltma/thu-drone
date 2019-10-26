@@ -1,0 +1,26 @@
+<annotation>
+	<folder>dataset</folder>
+	<filename>000380.jpg</filename>
+	<path>C:\Users\ASUS\Desktop\something\dataset\dataset\000380.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>960</width>
+		<height>720</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>baby</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>383</xmin>
+			<ymin>93</ymin>
+			<xmax>525</xmax>
+			<ymax>284</ymax>
+		</bndbox>
+	</object>
+</annotation>

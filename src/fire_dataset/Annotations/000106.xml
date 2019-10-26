@@ -1,0 +1,26 @@
+<annotation>
+	<folder>dataset</folder>
+	<filename>000106.jpg</filename>
+	<path>C:\Users\ASUS\Desktop\something\dataset\dataset\000106.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>960</width>
+		<height>720</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>gas tank</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>334</xmin>
+			<ymin>324</ymin>
+			<xmax>466</xmax>
+			<ymax>511</ymax>
+		</bndbox>
+	</object>
+</annotation>

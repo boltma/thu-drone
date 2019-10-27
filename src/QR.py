@@ -4,6 +4,8 @@ import cv2
 from pyzbar.pyzbar import decode
 import numpy as np
 import os
+import sys
+import getopt
 
 ROWS = 600
 COLS = 600
@@ -120,7 +122,7 @@ def FindQr(imgSrc):
 
     # 二值化
     _, imgBinary = cv2.threshold(erosion, 100, 255, cv2.THRESH_BINARY)
-    cv2.imshow("g", imgBinary)
+    cv2.imshow("binary", imgBinary)
 
     # 查找轮廓
     contours, hierarchy = cv2.findContours(imgBinary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[-2:]
@@ -202,13 +204,35 @@ def FindQr(imgSrc):
 
 
 if __name__ == '__main__':
-    # 读入图像
+    """
+    参数输入：
+    -p --path   数据文件夹相对路径，默认为'./experiment2/imgs'
+    -n --num    所选图片编号，范围1~14
+    示例：python QR.py -n 1
+    按任意键关闭所有图片后显示二维码信息
+    """
     data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment2", "imgs")
-    image = cv2.imread(os.path.join(data_path, str(12) + ".jpg"))
+
+    n = 1
+    opts, args = getopt.getopt(sys.argv[1:], '-p:-n:', ['path=', 'num='])
+    for opt_name, opt_value in opts:
+        if opt_name in ('-p', '--path'):
+            data_path = opt_value
+        if opt_name in ('-n', '--num'):
+            n = int(opt_value)
+            if n - 1 not in range(14):
+                print("image number out of range")
+                exit()
+
+    # 读入图像
+    image = cv2.imread(os.path.join(data_path, str(n) + ".png"))
     # 打印信息
     print(image.shape[:2])
 
     # 处理图像
     qrcode = FindQr(image)
-    print("Detected QR Code:")
-    print(qrcode)
+    if qrcode:
+        print("Detected QR Code:")
+        print(qrcode)
+    else:
+        print("No QR Code detected")

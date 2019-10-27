@@ -67,7 +67,7 @@ def T2R(T):
 if __name__ == '__main__':
     """
     参数输入：
-    -p --path   数据文件夹相对路径，默认为'./experiment'，内含color，depth文件夹即pose.txt
+    -p --path   数据文件夹相对路径，默认为'./experiment1'，内含color、depth文件夹及pose.txt
     -n --num    所选图片编号，范围1~5
     -r --row    所选像素行号
     -c --col    所选像素列号

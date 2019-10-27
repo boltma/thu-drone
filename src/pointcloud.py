@@ -4,6 +4,8 @@ import numpy as np
 import cv2
 import rospy
 import os
+import sys
+import getopt
 from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs import point_cloud2
 
@@ -63,27 +65,52 @@ def T2R(T):
 
 
 if __name__ == '__main__':
+    """
+    参数输入：
+    -p --path   数据文件夹相对路径，默认为'./experiment'，内含color，depth文件夹即pose.txt
+    -n --num    所选图片编号，范围1~5
+    -r --row    所选像素行号
+    -c --col    所选像素列号
+    示例：python pointcloud.py -n 1 -r 43 -c 217 应输出[-3.23940916 -2.52866315  6.15110785]的坐标
+    """
+    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment1")
+    n = -1
+    r = -1
+    c = -1
+
+    opts, args = getopt.getopt(sys.argv[1:], '-p:-n:-r:-c:', ['path=', 'num=', 'row=', 'col='])
+    for opt_name, opt_value in opts:
+        if opt_name in ('-p', '--path'):
+            data_path = opt_value
+        if opt_name in ('-n', '--num'):
+            n = int(opt_value)
+        if opt_name in ('-r', '--row'):
+            r = int(opt_value)
+        if opt_name in ('-c', '--col'):
+            c = int(opt_value)
+
     # 实验二：坐标转换
     colorImgs = []  # 保存RGB图的列表
     depthImgs = []  # 保存深度图的列表
     poses = []  # 保存相机的外参，即转换后的变换矩阵
 
     # 读取文件，将外参保存在列表中
-    data_path = os.path.join(os.path.dirname(
-        os.path.abspath(__file__)), "experiment1")
     pose_data = np.loadtxt(os.path.join(data_path, "pose.txt"))
 
     for i in range(5):
         # 利用opencv读取RGB和深度图，按顺序保存在colorImgs和depthImgs中
-        colorImgs.append(cv2.imread(os.path.join(
-            data_path, "color", str(i + 1) + ".png")))
-        depthImgs.append(cv2.imread(os.path.join(
-            data_path, "depth", str(i + 1) + ".pgm"), cv2.IMREAD_UNCHANGED))
+        colorImgs.append(cv2.imread(os.path.join(data_path, "color", str(i + 1) + ".png")))
+        depthImgs.append(cv2.imread(os.path.join(data_path, "depth", str(i + 1) + ".pgm"), cv2.IMREAD_UNCHANGED))
 
         # 将poses列表中的单元转成变换矩阵T储存
         R = q2R(np.roll(pose_data[i][3:], 1))  # 将实部移至四元数开始以代入q2R函数
         t = pose_data[i][:3]
         poses.append(R2T(R, t))
+
+    flag = True
+    if n - 1 not in range(5) or r not in range(colorImgs[n - 1].shape[0]) or c not in range(colorImgs[n - 1].shape[1]):
+        print("Image number or pixel location not specified or out of range.")
+        flag = False
 
     # 计算点云并拼接
     # 相机内参
@@ -97,6 +124,9 @@ if __name__ == '__main__':
 
     # 新建一个列表，保存所有点的世界坐标
     cloudWorld = []
+
+    # 保存所计算的指定点坐标
+    coordinates = []
 
     for i in range(5):
         print("processing image " + str(i + 1))
@@ -121,6 +151,13 @@ if __name__ == '__main__':
         color = np.array(color.reshape(-1, 3).T, dtype=np.int32)  # 将原图转为二维
         rgb = (color[2] << 16) + (color[1] << 8) + color[0]  # 将rgb信息打包
         cloudWorld.extend(np.array(np.vstack((Pw, rgb)), dtype=np.float32).T)
+
+        # 获取指定点的坐标
+        if flag and n - 1 == i:
+            coordinates = Pw[:, r * cols + c]
+
+    if flag:
+        print("The coordinates of the specified pixel is: " + str(coordinates))
 
     # ROS相关操作，将点云信息发布出去
     rospy.init_node('test', anonymous=True)

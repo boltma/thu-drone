@@ -225,7 +225,7 @@ if __name__ == '__main__':
                 exit()
 
     # 读入图像
-    image = cv2.imread(os.path.join(data_path, str(n) + ".png"))
+    image = cv2.imread(os.path.join(data_path, str(n) + ".jpg"))
     # 打印信息
     print(image.shape[:2])
 

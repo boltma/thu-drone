@@ -1,28 +1,32 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import rospy
-from std_msgs.msg import String
-import cv2
-import tello_new as tello
-from cv_bridge import CvBridge, CvBridgeError
-from sensor_msgs.msg import Image
+import sys
 import time
 import threading
 import random
 import numpy as np
-import sys
+
+import rospy
+from std_msgs.msg import String
+from cv_bridge import CvBridge, CvBridgeError
+from sensor_msgs.msg import Image
+# if you can not find cv2 in your python, you can try this. usually happen when you use conda.
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+import cv2
+import tello_base as tello
 
 y_max_th = 200
 y_min_th = 170
 
-tello_state = None
-tello_state_lock=threading.Lock()    
 img = None
-img_lock=threading.Lock()    
+tello_state='mid:-1;x:100;y:100;z:-170;mpry:1,180,1;pitch:0;roll:0;yaw:-19;'
+tello_state_lock = threading.Lock()    
+img_lock = threading.Lock()    
 
-class control_handler:   #通过这个类发送控制指令到command话题
-    def __init__(self,control_pub):
+# send command to tello
+class control_handler: 
+    def __init__(self, control_pub):
         self.control_pub = control_pub
     
     def forward(self, cm):
@@ -71,32 +75,32 @@ class control_handler:   #通过这个类发送控制指令到command话题
         command = "stop"
         self.control_pub.publish(command)
 
-
-class info_updater():   #初始化两个subscriber来订阅无人机的状态以及图像信息
+#subscribe tello_state and tello_image
+class info_updater():   
     def __init__(self):
-        rospy.Subscriber("tello_state",String,self.update_state)
-        rospy.Subscriber("tello_img",Image, self.update_img)
-        con_thread = threading.Thread(target=rospy.spin)
+        rospy.Subscriber("tello_state", String, self.update_state)
+        rospy.Subscriber("tello_image", Image, self.update_img)
+        con_thread = threading.Thread(target = rospy.spin)
         con_thread.start()
 
     def update_state(self,data):
-        global tello_state,tello_state_lock
-        tello_state_lock.acquire()#线程锁
+        global tello_state, tello_state_lock
+        tello_state_lock.acquire() #thread locker
         tello_state = data.data
         tello_state_lock.release()
         # print(tello_state)
 
     def update_img(self,data):
-        global img,img_lock
-        img_lock.acquire()#线程锁
-        img = CvBridge().imgmsg_to_cv2(data, desired_encoding="passthrough")
+        global img, img_lock
+        img_lock.acquire()#thread locker
+        img = CvBridge().imgmsg_to_cv2(data, desired_encoding = "passthrough")
         img_lock.release()
         # print(img)
 
 
-
-def parse_state():#将接收到的字符串类型的状态信息放进字典中方便查询
-    global tello_state,tello_state_lock
+# put string into dict, easy to find
+def parse_state():
+    global tello_state, tello_state_lock
     tello_state_lock.acquire()
     statestr = tello_state.split(';')
     print (statestr)
@@ -115,7 +119,7 @@ def parse_state():#将接收到的字符串类型的状态信息放进字典中�
             mpry = item.split(':')[-1]
             mpry = mpry.split(',')
             dict['mpry'] = [int(mpry[0]),int(mpry[1]),int(mpry[2])]
-        # y 有可能被匹配成 mpry 所以放在后面
+        # y can be recognized as mpry, so put y first
         elif 'y:' in item:
             y = int(item.split(':')[-1])
             dict['y'] = y
@@ -132,44 +136,44 @@ def parse_state():#将接收到的字符串类型的状态信息放进字典中�
     return dict
 
 def showimg():
-    global img,img_lock
+    global img, img_lock
     img_lock.acquire()
-    cv2.imshow("img",img)
+    cv2.imshow("tello_image", img)
     cv2.waitKey(30)
     img_lock.release()
 
-class task_handle():#初步完成起飞识别定位毯，并飞行至中央
+# mini task: take off and fly to the center of the blanket.
+class task_handle():
     class taskstages():
-        finding_location  = 0 # 如果连定位毯都没找到就先找定位毯子
-        order_location  = 1 # 找到定位毯之后把放到定位毯中心，朝向摆正
-        finished = 6 # 结束
+        finding_location  = 0 # find locating blanket 
+        order_location  = 1 # find the center of locating blanket and adjust tello 
+        finished = 6 # task done signal
 
     def __init__(self , ctrl):
         self.States_Dict = None
         self.ctrl = ctrl
         self.now_stage = self.taskstages.finding_location
 
-    def main(self): # 循环检测无人机是否完成任务，无人机移动到100
+    def main(self): # main function: examine whether tello finish the task
         while not (self.now_stage == self.taskstages.finished):
             if(self.now_stage == self.taskstages.finding_location):
                 self.finding_location()
             elif(self.now_stage == self.taskstages.order_location):
                 self.order_location()
-        print("finished")
+        print("Task Done!")
         exit(0)
     
-    def finding_location(self): # 找到定位毯位置，一般来说，只要够高就可以识别到
-        print ( "1234123" )
+    def finding_location(self): # find locating blanket (the higher, the easier)
         assert (self.now_stage == self.taskstages.finding_location)
-        while not ( parse_state()['mid'] > 0 ): # 如果没有找到定位毯，就一直尝试找
-            distance = random.randint(20,30) # 上升距离随机产生
+        while not ( parse_state()['mid'] > 0 ): # if no locating blanket is found:
+            distance = random.randint(20,30) # randomly select distance
             print (distance)
-            self.ctrl.up(distance) # 执行上升
-            time.sleep(4) # 等待操作完成
+            self.ctrl.up(distance) # tello up
+            time.sleep(4) # wait for command finished
             showimg()
         self.now_stage = self.taskstages.order_location
 
-    def order_location(self):# 找到定位毯之后，通过状态的反馈信息进行控制，循环执行使得飞机达到毯子中央
+    def order_location(self):# adjust tello to the center of locating blanket
         assert (self.now_stage == self.taskstages.order_location)
         state_conf = 0
         self.States_Dict = parse_state()
@@ -215,42 +219,21 @@ class task_handle():#初步完成起飞识别定位毯，并飞行至中央
 
 
 if __name__ == '__main__':
-    rospy.init_node('control_node', anonymous=True)
-    control_pub = rospy.Publisher('command',String, queue_size=1)
+    rospy.init_node('tello_control', anonymous=True)
+
+    control_pub = rospy.Publisher('command', String, queue_size=1)
     ctrl = control_handler(control_pub)
-    img,tello_state
     infouper = info_updater()
     tasker = task_handle(ctrl)
-    #################
+
     time.sleep(5.2)
-    print ( 1)
     ctrl.takeoff( )
-    print ( 4)
     time.sleep(4)
     ctrl.up(60)
     time.sleep(4)
-    # # print ( 2)
-    # # time.sleep(6)
-    # # print ( 3)
-    # # ctrl.left(20)
-    # # print ( 4)
-    # # time.sleep(6)
-    # # ctrl.right(20)
-    # # time.sleep(6)
-    # # print ( 5)
-    # # ctrl.forward(20)
-    # # time.sleep(6)
+
     tasker.main()
 
-    # time.sleep(1)
-    # ctrl.forward(100)
-    # time.sleep(6)
-    # ctrl.back(100)
-    # time.sleep(6)
-    # ctrl.right(100)
-    # time.sleep(6)
-    # # ctrl.left(100)
-    # time.sleep(6)
     # ctrl.land()
 
     

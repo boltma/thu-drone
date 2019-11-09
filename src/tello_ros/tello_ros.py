@@ -26,10 +26,10 @@ def control():
 	###########################
 	#开发使用,加入你自己的代码，可以直接利用img和state信息
 	###########################
-	
-	drone.send_command("takeoff")
-	drone.send_command("go 0 50 0 10")
-	drone.send_command("land")
+        pass	
+	#drone.send_command("takeoff")
+	#drone.send_command("go 0 50 0 10")
+	#drone.send_command("land")
 
 
 

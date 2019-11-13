@@ -39,7 +39,7 @@ mtx，相机内参；dist，畸变系数；revcs，旋转矩阵；tvecs，平移
 '''
 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 print(mtx, dist)
-np.save("mtx.npy", (mtx, dist))
+np.savez("mtx.npz", mtx=mtx, dist=dist)
 # 标定内参
 
 # 图像去畸变过程

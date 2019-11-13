@@ -5,6 +5,7 @@ import sys
 import time
 import threading
 import random
+import os
 import numpy as np
 
 import rospy
@@ -15,6 +16,7 @@ from sensor_msgs.msg import Image
 # if you can not find cv2 in your python, you can try this. usually happen when you use conda.
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
+
 # import tello_base as tello
 
 y_max_th = 200
@@ -24,10 +26,25 @@ img = None
 tello_state = 'mid:-1;x:100;y:100;z:-170;mpry:1,180,1;pitch:0;roll:0;yaw:-19;'
 tello_state_lock = threading.Lock()
 img_lock = threading.Lock()
+data = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mtx.npz"))
+mtx = data['mtx']
+dist = data['dist']
+
+
+def calib(imgSrc):
+    if imgSrc is None:
+        return
+    h, w = img.shape[:2]
+    newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 0.1, (w, h))
+    # 纠正畸变
+    dst = cv2.undistort(img, mtx, dist, None, newcameramtx)
+    return dst
 
 
 def FindCircle(imgSrc):
+    imgSrc = calib(imgSrc)
     imgSrcClone = np.copy(imgSrc)
+    row, col = imgSrc.shape[:2]
 
     img = cv2.GaussianBlur(imgSrc, (5, 5), 0)
     lower_red = np.array([0, 0, 100])
@@ -47,16 +64,32 @@ def FindCircle(imgSrc):
 
     if circles is None:
         print("Circle not found")
-        return None
+        return 0
 
     for (x, y, r) in circles:
+        # print(x, y, r)
+        print('###')
         print(x, y, r)
-        cv2.circle(imgSrcClone, (x, y), r, (0, 255, 0), 4)
+        print('###')
+        color = imgSrcClone[y][x]
+        if color[0] < 20 and color[1] < 20 and color[2] > 80:
+            if y < row / 3:
+                if x < col / 2:
+                    return 1
+                else:
+                    return 2
+            else:
+                if x < col / 2:
+                    return 3
+                else:
+                    return 4
+            cv2.circle(imgSrcClone, (x, y), r, (0, 255, 0), 4)
 
-    cv2.imshow("contour", imgSrcClone)
-    cv2.waitKey(0)
+    # cv2.imshow("contour", imgSrcClone)
+    # cv2.waitKey(0)
 
-    return
+    return 0
+
 
 # send command to tello
 class control_handler:
@@ -114,7 +147,7 @@ class info_updater():
     def __init__(self):
         rospy.Subscriber("tello_state", String, self.update_state)
         rospy.Subscriber("tello_image", Image, self.update_img)
-        self.con_thread = threading.Thread(target = rospy.spin)
+        self.con_thread = threading.Thread(target=rospy.spin)
         self.con_thread.start()
 
     def update_state(self, data):
@@ -202,7 +235,18 @@ class task_handle():
             elif self.now_stage == self.taskstages.order_location:
                 self.order_location()
             elif self.now_stage == self.taskstages.finding_fire:
-                self.order_location({'x': 150, 'y': 150, 'z': 150, 'yaw': -90})
+                code = FindCircle(img)
+                print(code)
+                if code == 1:
+                    self.order_location({'x': 75, 'y': 50, 'z': 204, 'mpry': 0})
+                if code == 2:
+                    self.order_location({'x': 130, 'y': 50, 'z': 204, 'mpry': 0})
+                if code == 3:
+                    self.order_location({'x': 75, 'y': 50, 'z': 150, 'mpry': 0})
+                if code == 4:
+                    self.order_location({'x': 130, 'y': 50, 'z': 150, 'mpry': 0})
+            elif self.now_stage == self.taskstages.passing_fire:
+                self.pass_fire()
         self.ctrl.land()
         print("Task Done!")
 
@@ -229,7 +273,7 @@ class task_handle():
         # yaw = location['yaw']
         self.States_Dict = parse_state()
         while not (mpry + 8 >= self.States_Dict['mpry'][1] + 90 >= mpry - 8 and
-                   x + 20 >= self.States_Dict['x'] >= x - 20 and
+                   x + 5 >= self.States_Dict['x'] >= x - 5 and
                    y + 20 >= self.States_Dict['y'] >= y - 20 and
                    z + 20 >= abs(self.States_Dict['z']) >= z - 20):
             if abs(self.States_Dict['z']) > z + 20 or abs(self.States_Dict['z']) < z - 20:
@@ -239,11 +283,11 @@ class task_handle():
                 elif abs(self.States_Dict['z']) > z + 20:
                     self.ctrl.down(20)
                     time.sleep(4)
-            elif self.States_Dict['mpry'][1] + 90 < mpry - 8 or self.States_Dict['mpry'] + 90 > mpry + 8:
+            elif self.States_Dict['mpry'][1] + 90 < mpry - 8 or self.States_Dict['mpry'][1] + 90 > mpry + 8:
                 if self.States_Dict['mpry'][1] + 90 < mpry - 8:
                     self.ctrl.cw(10)
                     time.sleep(4)
-                elif self.States_Dict['mpry'][1] > mpry + 8:
+                elif self.States_Dict['mpry'][1] + 90 > mpry + 8:
                     self.ctrl.ccw(10)
                     time.sleep(4)
             elif self.States_Dict['x'] < x - 20 or self.States_Dict['x'] > x + 20:
@@ -252,6 +296,13 @@ class task_handle():
                     time.sleep(4)
                 elif self.States_Dict['x'] > x + 20:
                     self.ctrl.left(20)
+                    time.sleep(4)
+            elif x - 20 <= self.States_Dict['x'] < x - 5 or x + 20 >= self.States_Dict['x'] > x + 5:
+                if self.States_Dict['x'] < x - 5:
+                    self.ctrl.right(5)
+                    time.sleep(4)
+                elif self.States_Dict['x'] > x + 5:
+                    self.ctrl.left(5)
                     time.sleep(4)
             elif self.States_Dict['y'] < y - 20 or self.States_Dict['y'] > y + 20:
                 if self.States_Dict['y'] < y - 20:
@@ -272,7 +323,16 @@ class task_handle():
                 return
                 # break
         print("Success")
-        self.now_stage = self.taskstages.finding_fire
+        if self.now_stage == self.taskstages.finding_fire:
+            self.now_stage = self.taskstages.passing_fire
+        else:
+            self.now_stage = self.taskstages.finding_fire
+
+    def pass_fire(self):
+        assert (self.now_stage == self.taskstages.passing_fire)
+        self.ctrl.forward(100)
+        time.sleep(4)
+        self.now_stage = self.taskstages.finished
 
 
 if __name__ == '__main__':

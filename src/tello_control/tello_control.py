@@ -65,11 +65,12 @@ def FindCircle(imgSrc):
 
     circles = cv2.HoughCircles(imgBinary, cv2.HOUGH_GRADIENT, 2, 100, param1=100, param2=30, minRadius=10,
                                maxRadius=100)
-    circles = np.round(circles[0, :]).astype("int")
 
     if circles is None:
         print("Circle not found")
         return 0
+
+    circles = np.round(circles[0, :]).astype("int")
 
     for (x, y, r) in circles:
         # print(x, y, r)
@@ -88,7 +89,7 @@ def FindCircle(imgSrc):
                     return 3
                 else:
                     return 4
-            cv2.circle(imgSrcClone, (x, y), r, (0, 255, 0), 4)
+            # cv2.circle(imgSrcClone, (x, y), r, (0, 255, 0), 4)
 
     # cv2.imshow("contour", imgSrcClone)
     # cv2.waitKey(0)
@@ -261,33 +262,41 @@ class task_handle():
                 code = FindCircle(img)
                 print(code)
                 if code == 1:
-                    self.order_location({'x': 75, 'y': 50, 'z': 204, 'mpry': 0})
+                    self.order_location({'x': 135, 'y': 75, 'z': 204, 'mpry': 90})
                 if code == 2:
-                    self.order_location({'x': 130, 'y': 50, 'z': 204, 'mpry': 0})
+                    self.order_location({'x': 135, 'y': 130, 'z': 204, 'mpry': 90})
                 if code == 3:
-                    self.order_location({'x': 75, 'y': 50, 'z': 150, 'mpry': 0})
+                    self.order_location({'x': 135, 'y': 75, 'z': 153, 'mpry': 90})
                 if code == 4:
-                    self.order_location({'x': 130, 'y': 50, 'z': 150, 'mpry': 0})
+                    self.order_location({'x': 135, 'y': 130, 'z': 153, 'mpry': 90})
+                else:
+                    self.now_stage = self.taskstages.order_location
             elif self.now_stage == self.taskstages.passing_fire:
                 self.pass_fire()
             elif self.now_stage == self.taskstages.finding_ball:
                 code = FindBall(img, _id)
                 print(code)
                 if code == 1:
-                    self.order_location({'x': 0, 'y': 100, 'z': 210, 'mpry': 0})
-                    self.ctrl.cw(359)
-                    time.sleep(4)
+                    self.order_location({'x': 300, 'y': 0, 'z': 170, 'mpry': 90})
+                    # self.ctrl.cw(359)
+                    # time.sleep(4)
                 if code == 2:
-                    self.ctrl.forward(50)
-                    time.sleep(4)
-                    self.ctrl.cw(359)
-                    time.sleep(4)
+                    pass
+                    # self.ctrl.forward(30)
+                    # time.sleep(4)
+                    # self.ctrl.cw(359)
+                    # time.sleep(4)
                 if code == 3:
-                    self.order_location({'x': 200, 'y': 100, 'z': 210, 'mpry': 0})
-                    self.ctrl.cw(359)
-                    time.sleep(4)
+                    self.order_location({'x': 300, 'y': 200, 'z': 170, 'mpry': 90})
+                    # self.ctrl.cw(359)
+                    # time.sleep(4)
                 else:
+                    self.now_stage = self.taskstages.order_location
                     continue
+                self.ctrl.up(100)
+                time.sleep(8)
+                self.ctrl.forward(200)
+                time.sleep(15)
                 self.now_stage = self.taskstages.finished
         self.ctrl.land()
         print("Task Done!")
@@ -304,8 +313,10 @@ class task_handle():
 
     def order_location(self, location=None):  # adjust tello to the center of locating blanket
         if location is None:
-            location = {'x': 100, 'y': 100, 'z': 170,
-                        'mpry': 0}
+            if self.passed_fire:
+                location = {'x': 300, 'y': 100, 'z': 170, 'mpry': 90}
+            else:
+                location = {'x': 100, 'y': 100, 'z': 170, 'mpry': 90}
         # assert (self.now_stage == self.taskstages.order_location)
         state_conf = 0
         x = location['x']
@@ -315,15 +326,22 @@ class task_handle():
         # yaw = location['yaw']
         self.States_Dict = parse_state()
         while not (mpry + 8 >= self.States_Dict['mpry'][1] + 90 >= mpry - 8 and
-                   x + 5 >= self.States_Dict['x'] >= x - 5 and
-                   y + 20 >= self.States_Dict['y'] >= y - 20 and
-                   z + 20 >= abs(self.States_Dict['z']) >= z - 20):
+                   x + 20 >= self.States_Dict['x'] >= x - 20 and
+                   y + 5 >= self.States_Dict['y'] >= y - 5 and
+                   z + 10 >= abs(self.States_Dict['z']) >= z - 10):
             if abs(self.States_Dict['z']) > z + 20 or abs(self.States_Dict['z']) < z - 20:
                 if abs(self.States_Dict['z']) < z - 20:
                     self.ctrl.up(20)
                     time.sleep(4)
                 elif abs(self.States_Dict['z']) > z + 20:
                     self.ctrl.down(20)
+                    time.sleep(4)
+            elif abs(self.States_Dict['z']) > z + 10 or abs(self.States_Dict['z']) < z - 10:
+                if abs(self.States_Dict['z']) > z + 10:
+                    self.ctrl.down(10)
+                    time.sleep(4)
+                elif abs(self.States_Dict['z']) < z - 10:
+                    self.ctrl.up(10)
                     time.sleep(4)
             elif self.States_Dict['mpry'][1] + 90 < mpry - 8 or self.States_Dict['mpry'][1] + 90 > mpry + 8:
                 if self.States_Dict['mpry'][1] + 90 < mpry - 8:
@@ -334,24 +352,31 @@ class task_handle():
                     time.sleep(4)
             elif self.States_Dict['x'] < x - 20 or self.States_Dict['x'] > x + 20:
                 if self.States_Dict['x'] < x - 20:
-                    self.ctrl.right(20)
+                    self.ctrl.forward(20)
                     time.sleep(4)
                 elif self.States_Dict['x'] > x + 20:
-                    self.ctrl.left(20)
-                    time.sleep(4)
-            elif x - 20 <= self.States_Dict['x'] < x - 5 or x + 20 >= self.States_Dict['x'] > x + 5:
-                if self.States_Dict['x'] < x - 5:
-                    self.ctrl.right(5)
-                    time.sleep(4)
-                elif self.States_Dict['x'] > x + 5:
-                    self.ctrl.left(5)
-                    time.sleep(4)
-            elif self.States_Dict['y'] < y - 20 or self.States_Dict['y'] > y + 20:
-                if self.States_Dict['y'] < y - 20:
                     self.ctrl.back(20)
                     time.sleep(4)
+            # elif x - 20 <= self.States_Dict['x'] < x - 5 or x + 20 >= self.States_Dict['x'] > x + 5:
+            #     if self.States_Dict['x'] < x - 5:
+            #         self.ctrl.forward(5)
+            #         time.sleep(4)
+            #     elif self.States_Dict['x'] > x + 5:
+            #         self.ctrl.back(5)
+            #         time.sleep(4)
+            elif self.States_Dict['y'] < y - 20 or self.States_Dict['y'] > y + 20:
+                if self.States_Dict['y'] < y - 20:
+                    self.ctrl.right(20)
+                    time.sleep(4)
                 elif self.States_Dict['y'] > y + 20:
-                    self.ctrl.forward(20)
+                    self.ctrl.left(20)
+                    time.sleep(4)
+            elif y - 20 <= self.States_Dict['y'] < y - 5 or y + 20 >= self.States_Dict['y'] > y + 5:
+                if self.States_Dict['y'] < y - 5:
+                    self.ctrl.right(10)
+                    time.sleep(4)
+                elif self.States_Dict['y'] > y + 5:
+                    self.ctrl.left(10)
                     time.sleep(4)
             else:
                 time.sleep(2)
@@ -376,7 +401,7 @@ class task_handle():
     def pass_fire(self):
         assert (self.now_stage == self.taskstages.passing_fire)
         self.ctrl.forward(150)
-        time.sleep(4)
+        time.sleep(10)
         self.now_stage = self.taskstages.finding_location
         self.passed_fire = True
 

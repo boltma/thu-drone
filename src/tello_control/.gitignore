@@ -2,3 +2,4 @@
 libh264decoder.so
 *.pyc
 __pycache__
+/weights/*.pt

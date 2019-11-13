@@ -12,12 +12,16 @@ import rospy
 from std_msgs.msg import String
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
+from detect import *
 
 # if you can not find cv2 in your python, you can try this. usually happen when you use conda.
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 
 # import tello_base as tello
+
+# basketball football volleyball balloon
+_id = 0
 
 y_max_th = 200
 y_min_th = 170
@@ -29,6 +33,7 @@ img_lock = threading.Lock()
 data = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mtx.npz"))
 mtx = data['mtx']
 dist = data['dist']
+model, device = load_weight()
 
 
 def calib(imgSrc):
@@ -88,6 +93,24 @@ def FindCircle(imgSrc):
     # cv2.imshow("contour", imgSrcClone)
     # cv2.waitKey(0)
 
+    return 0
+
+
+def FindBall(imgSrc, _id):
+    imgSrc = calib(imgSrc)
+    row, col = imgSrc.shape[:2]
+    result = detect_ball(model, device, imgSrc)
+    for ball in result:
+        if int(ball[6].item()) == _id:
+            x = (ball[0].item() + ball[2].item()) / 2
+            # y = (ball[1].item() + ball[3].item()) / 2
+            if x < col / 3:
+                return 1
+            elif col / 3 <= x <= 2 * col / 3:
+                return 2
+            else:
+                return 3
+            pass
     return 0
 
 
@@ -247,6 +270,25 @@ class task_handle():
                     self.order_location({'x': 130, 'y': 50, 'z': 150, 'mpry': 0})
             elif self.now_stage == self.taskstages.passing_fire:
                 self.pass_fire()
+            elif self.now_stage == self.taskstages.finding_ball:
+                code = FindBall(img, _id)
+                print(code)
+                if code == 1:
+                    self.order_location({'x': 0, 'y': 100, 'z': 210, 'mpry': 0})
+                    self.ctrl.cw(359)
+                    time.sleep(4)
+                if code == 2:
+                    self.ctrl.forward(50)
+                    time.sleep(4)
+                    self.ctrl.cw(359)
+                    time.sleep(4)
+                if code == 3:
+                    self.order_location({'x': 200, 'y': 100, 'z': 210, 'mpry': 0})
+                    self.ctrl.cw(359)
+                    time.sleep(4)
+                else:
+                    continue
+                self.now_stage = self.taskstages.finished
         self.ctrl.land()
         print("Task Done!")
 
@@ -326,13 +368,17 @@ class task_handle():
         if self.now_stage == self.taskstages.finding_fire:
             self.now_stage = self.taskstages.passing_fire
         else:
-            self.now_stage = self.taskstages.finding_fire
+            if self.passed_fire:
+                self.now_stage = self.taskstages.finding_ball
+            else:
+                self.now_stage = self.taskstages.finding_fire
 
     def pass_fire(self):
         assert (self.now_stage == self.taskstages.passing_fire)
-        self.ctrl.forward(100)
+        self.ctrl.forward(150)
         time.sleep(4)
-        self.now_stage = self.taskstages.finished
+        self.now_stage = self.taskstages.finding_location
+        self.passed_fire = True
 
 
 if __name__ == '__main__':

@@ -250,6 +250,7 @@ class task_handle():
         self.States_Dict = None
         self.ctrl = ctrl
         self.passed_fire = False
+        self.fire_code = -1
         self.now_stage = self.taskstages.finding_location
 
     def main(self):  # main function: examine whether tello finish the task
@@ -261,15 +262,12 @@ class task_handle():
             elif self.now_stage == self.taskstages.finding_fire:
                 code = FindCircle(img)
                 print(code)
-                if code == 1:
-                    self.order_location({'x': 135, 'y': 75, 'z': 204, 'mpry': 90})
-                if code == 2:
-                    self.order_location({'x': 135, 'y': 130, 'z': 204, 'mpry': 90})
-                if code == 3:
-                    self.order_location({'x': 135, 'y': 75, 'z': 153, 'mpry': 90})
-                if code == 4:
-                    self.order_location({'x': 135, 'y': 130, 'z': 153, 'mpry': 90})
+                if code != 0:
+                    self.fire_code = code
+                    self.order_location()
                 else:
+                    self.ctrl.up(20)
+                    time.sleep(4)
                     self.now_stage = self.taskstages.order_location
             elif self.now_stage == self.taskstages.passing_fire:
                 self.pass_fire()
@@ -277,26 +275,38 @@ class task_handle():
                 code = FindBall(img, _id)
                 print(code)
                 if code == 1:
-                    self.order_location({'x': 300, 'y': 0, 'z': 170, 'mpry': 90})
-                    # self.ctrl.cw(359)
-                    # time.sleep(4)
-                if code == 2:
-                    pass
-                    # self.ctrl.forward(30)
-                    # time.sleep(4)
-                    # self.ctrl.cw(359)
-                    # time.sleep(4)
+                    self.ctrl.left(30)
+                    time.sleep(4)
                 if code == 3:
-                    self.order_location({'x': 300, 'y': 200, 'z': 170, 'mpry': 90})
+                    self.ctrl.right(30)
+                    time.sleep(4)
+                if code == 1 or code == 2 or code == 3:
+                    self.ctrl.down(100)
+                    time.sleep(10)
+                    self.ctrl.forward(150)
+                    time.sleep(10)
+
+                    # self.order_location({'x': 300, 'y': 50, 'z': 110, 'mpry': 90})
                     # self.ctrl.cw(359)
                     # time.sleep(4)
+                # if code == 2:
+                #     self.order_location({'x': 300, 'y': 100, 'z': 110, 'mpry': 90})
+                #     pass
+                #     # self.ctrl.forward(30)
+                #     # time.sleep(4)
+                #     # self.ctrl.cw(359)
+                #     # time.sleep(4)
+                # if code == 3:
+                #     self.order_location({'x': 300, 'y': 150, 'z': 110, 'mpry': 90})
+                #     # self.ctrl.cw(359)
+                #     # time.sleep(4)
                 else:
                     self.now_stage = self.taskstages.order_location
                     continue
-                self.ctrl.up(100)
-                time.sleep(8)
-                self.ctrl.forward(200)
-                time.sleep(15)
+                # self.ctrl.up(100)
+                # time.sleep(8)
+                # self.ctrl.forward(200)
+                # time.sleep(15)
                 self.now_stage = self.taskstages.finished
         self.ctrl.land()
         print("Task Done!")
@@ -315,6 +325,16 @@ class task_handle():
         if location is None:
             if self.passed_fire:
                 location = {'x': 300, 'y': 100, 'z': 170, 'mpry': 90}
+            elif self.fire_code != -1:
+                code = self.fire_code
+                if code == 1:
+                    location = {'x': 135, 'y': 75, 'z': 204, 'mpry': 90}
+                elif code == 2:
+                    location = {'x': 135, 'y': 130, 'z': 204, 'mpry': 90}
+                elif code == 3:
+                    location = {'x': 135, 'y': 75, 'z': 153, 'mpry': 90}
+                elif code == 4:
+                    location = {'x': 135, 'y': 130, 'z': 153, 'mpry': 90}
             else:
                 location = {'x': 100, 'y': 100, 'z': 170, 'mpry': 90}
         # assert (self.now_stage == self.taskstages.order_location)
@@ -338,10 +358,14 @@ class task_handle():
                     time.sleep(4)
             elif abs(self.States_Dict['z']) > z + 10 or abs(self.States_Dict['z']) < z - 10:
                 if abs(self.States_Dict['z']) > z + 10:
-                    self.ctrl.down(10)
+                    self.ctrl.up(20)
+                    time.sleep(4)
+                    self.ctrl.down(30)
                     time.sleep(4)
                 elif abs(self.States_Dict['z']) < z - 10:
-                    self.ctrl.up(10)
+                    self.ctrl.up(30)
+                    time.sleep(4)
+                    self.ctrl.down(20)
                     time.sleep(4)
             elif self.States_Dict['mpry'][1] + 90 < mpry - 8 or self.States_Dict['mpry'][1] + 90 > mpry + 8:
                 if self.States_Dict['mpry'][1] + 90 < mpry - 8:
@@ -373,10 +397,14 @@ class task_handle():
                     time.sleep(4)
             elif y - 20 <= self.States_Dict['y'] < y - 5 or y + 20 >= self.States_Dict['y'] > y + 5:
                 if self.States_Dict['y'] < y - 5:
-                    self.ctrl.right(10)
+                    self.ctrl.right(30)
+                    time.sleep(4)
+                    self.ctrl.left(20)
                     time.sleep(4)
                 elif self.States_Dict['y'] > y + 5:
-                    self.ctrl.left(10)
+                    self.ctrl.left(30)
+                    time.sleep(4)
+                    self.ctrl.right(20)
                     time.sleep(4)
             else:
                 time.sleep(2)
@@ -400,7 +428,8 @@ class task_handle():
 
     def pass_fire(self):
         assert (self.now_stage == self.taskstages.passing_fire)
-        self.ctrl.forward(150)
+        self.fire_code = -1
+        self.ctrl.forward(100)
         time.sleep(10)
         self.now_stage = self.taskstages.finding_location
         self.passed_fire = True
